@@ -1,40 +1,33 @@
-// const express = require("express");
-// require("dotenv").config();
-
-// const root = require("../../models/Admin");
+ const express = require("express");
+ require("dotenv").config();
+ const bcrypt = require("bcrypt");
+ const jwt = require("jsonwebtoken");
+ require("dotenv").config();
+ const { StatusCodes } = require("http-status-codes");
 const responsemessage = require("../../utils/ResponseMessage.json");
-const sendEmail = require("../../services/EmailService");
 const {
-  passwordencrypt,
-  generateOTP,
+  passwordencrypt, 
   validatePassword,
 } = require("../../services/CommonService");
 const { admingenerateJwt } = require("../../utils/jwt");
-// require("../../middleware/FileUpload");
+const connection = require("../../config/Db.config");
 
-// let isadminuser = true;
 
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-require("dotenv").config();
-const { StatusCodes } = require("http-status-codes");
-
-// const connection = require("../../config/Db.config");
 
 exports.AdminSingup = (req, res) => {
-  let { userName, email, mobile, password } = req.body;
+  let { adminName, email, phone, password } = req.body;
   try {
-    const checkQuery = "SELECT * FROM admindata WHERE email = ? OR mobile = ?";
-    connection.query(checkQuery, [email, mobile], async (error, results) => {
-      let existemail = results.find((admindata) => admindata.email === email);
-      let existmobile = results.find(
-        (admindata) => admindata.mobile === parseInt(mobile, 10)
+    const checkQuery = "SELECT * FROM admin WHERE email = ? OR phone = ?";
+    connection.query(checkQuery, [email, phone], async (error, results) => {
+      let existemail = results.find((admin) => admin.email === email);
+      let existphone = results.find(
+        (admin) => admin.phone === parseInt(phone, 10)
       );
 
-      if (existemail || existmobile) {
+      if (existemail || existphone) {
         const message = existemail
           ? responsemessage.EMAILEXITS
-          : responsemessage.MOBILEEXITS;
+          : responsemessage.phoneEXITS;
 
         res.status(400).json({
           status: StatusCodes.BAD_REQUEST,
@@ -49,10 +42,10 @@ exports.AdminSingup = (req, res) => {
         } else {
           const hashPassword = await passwordencrypt(password);
           const insertQuery =
-            "INSERT INTO admindata (userName, email, mobile, password) VALUES (?,?, ?, ?)";
+            "INSERT INTO admin (adminName, email, phone, password) VALUES (?, ?, ?, ?)";
           connection.query(
             insertQuery,
-            [userName, email, mobile, hashPassword],
+            [adminName, email, phone, hashPassword],
             (error, insertResults) => {
               if (error) {
                 return res.status(400).json({
@@ -77,15 +70,16 @@ exports.AdminSingup = (req, res) => {
     });
   }
 };
+
 exports.AdminSingIn = async (req, res) => {
   try {
-    const { userName, email, mobile, password } = req.body;
+    const { masterfield,adminName, email, phone, password } = req.body;
 
     const selectdata =
-      "SELECT * FROM admindata WHERE email = ? OR userName = ? OR mobile = ?";
+      "SELECT * FROM admin WHERE email = ? OR adminName = ? OR phone = ?";
     connection.query(
       selectdata,
-      [email, userName, mobile],
+      [masterfield, masterfield, masterfield],
       async (err, results) => {
         if (!results || results.length === 0) {
           return res.status(404).json({
@@ -122,7 +116,7 @@ exports.AdminSingIn = async (req, res) => {
                 return res.status(200).json({
                   status: StatusCodes.OK,
                   userLogin: userLogin.email,
-                  Mobile: userLogin.mobile,
+                  phone: userLogin.phone,
                   success: true,
                   token: token,
                   message: responsemessage.SUCCESS,
@@ -141,13 +135,13 @@ exports.AdminSingIn = async (req, res) => {
   }
 };
 
-exports.UpdateAdminData = async (req, res) => {
+exports.Updateadmin = async (req, res) => {
   try {
-    let { email, mobile } = req.body;
-    console.log(req.body);
+    let { email, phone } = req.body;
+   
     let userId = req.AdminUser;
 
-    const selectQuery = "SELECT * FROM admindata WHERE id = ?";
+    const selectQuery = "SELECT * FROM admin WHERE id = ?";
 
     connection.query(selectQuery, [userId], async (error, results) => {
       if (error) {
@@ -158,35 +152,31 @@ exports.UpdateAdminData = async (req, res) => {
       } else {
         const existingUser = results[0];
         const checkQuery =
-          "SELECT * FROM admindata WHERE email = ? OR mobile = ?";
+          "SELECT * FROM admin WHERE email = ? OR phone = ?";
 
         connection.query(
           checkQuery,
-          [email, mobile],
+          [email, phone],
           async (error, results) => {
             let existemail = results.find(
-              (admindata) => admindata.email === email
+              (admin) => admin.email === email
             );
 
-            const existmobile = results.find(
-              (admindata) => admindata.mobile === parseInt(mobile, 10)
+            const existphone = results.find(
+              (admin) => admin.phone === parseInt(phone, 10)
             );
 
-            if (existemail || existmobile) {
+            if (existemail || existphone) {
               const message = existemail
                 ? responsemessage.EMAILEXITS
-                : responsemessage.MOBILEEXITS;
+                : responsemessage.phoneEXITS;
 
               res.status(400).json({
                 status: StatusCodes.BAD_REQUEST,
                 message,
               });
             } else {
-              // const useremail = email ? email.toLowerCase() : undefined;
-              console.log();
-              const profile = req.profileUrl;
-              const document = JSON.stringify(req.documentUrl);
-
+           
               const updatedatas = [];
               const updateValues = [];
 
@@ -194,25 +184,18 @@ exports.UpdateAdminData = async (req, res) => {
                 updatedatas.push("email = ?");
                 updateValues.push(email.toLowerCase());
               }
-              if (mobile) {
-                updatedatas.push("mobile = ?");
-                updateValues.push(mobile);
+              if (phone) {
+                updatedatas.push("phone = ?");
+                updateValues.push(phone);
               }
-              if (profile) {
-                updatedatas.push("profile = ?");
-                updateValues.push(profile);
-              }
-              if (document) {
-                updatedatas.push("document = ?");
-                updateValues.push(document);
-              }
+             
               if (updatedatas.length === 0) {
                 return res.status(404).json({
                   status: StatusCodes.NOT_FOUND,
                   message: responsemessage.NOTFOUND,
                 });
               } else {
-                const updateQuery = `UPDATE admindata SET ${updatedatas.join(
+                const updateQuery = `UPDATE admin SET ${updatedatas.join(
                   ", "
                 )} WHERE id = ?`;
                 updateValues.push(userId);
@@ -244,145 +227,15 @@ exports.UpdateAdminData = async (req, res) => {
   }
 };
 
-exports.SendOTP = async (req, res) => {
+exports.Adminchangepassword = async (req, res) => {
   try {
-    const { email } = req.body;
 
-    const expiry = Date.now() + 2 * 60 * 1000; // 10 minutes
-    const expiryIST = new Date(expiry).toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-    });
+    const userId = req.AdminUser;
+    const {oldPassword, newPassword, confirmPassword } = req.body;
+  
+    const selectQuery = "SELECT * FROM admin WHERE id = ?";
 
-    const userQuery = "SELECT * FROM admindata WHERE email = ?";
-
-    connection.query(userQuery, [email], async (userError, userRows) => {
-      // if (userError) {
-      //   console.log("Error selecting user:", userError);
-      //   return res.status(500).json({
-      //     status: 500,
-      //     message: responsemessage.INTERROR,
-      //   });
-      // }
-
-      if (userRows.length === 0) {
-        return res.status(404).json({
-          status: StatusCodes.NOT_FOUND,
-          message: responsemessage.NOTFOUND,
-        });
-      } else {
-        const OTP = generateOTP();
-
-        const updateUserQuery =
-          "UPDATE admindata SET otp = ?, otpExpire = ? WHERE email = ?";
-
-        const updateParams = [OTP, expiryIST, email];
-
-        connection.query(
-          updateUserQuery,
-          updateParams,
-          async (updateUserError, updateResult) => {
-            let response = await sendEmail(email, OTP);
-            if (response.error) {
-              return res.status(503).json({
-                status: StatusCodes.SERVICE_UNAVAILABLE,
-                message: responsemessage.SERVICE_UNAVAILABLE,
-              });
-            } else {
-              // console.log("Email sent:", response.email);
-              return res.status(200).json({
-                status: StatusCodes.OK,
-                email: email,
-                OTP: OTP,
-                otpExpire: expiryIST,
-                message: responsemessage.FOUNDDETAILS,
-              });
-            }
-          }
-        );
-      }
-    });
-  } catch (error) {
-    console.error("OTP error:", error);
-    return res.status(500).json({
-      status:StatusCodes.INTERNAL_SERVER_ERROR,
-      message: responsemessage.INTERNAL_SERVER_ERROR,
-    });
-  }
-};
-
-exports.AdminForgotPassword = async (req, res) => {
-  try {
-    const { email, newPassword, confirmPassword } = req.body;
-    if (!newPassword || !confirmPassword || !email) {
-      return res.status(400).json({
-        status: StatusCodes.BAD_REQUEST,
-        error: true,
-        message: responsemessage.NOTEMPTY,
-      });
-    } else if (!validatePassword(newPassword)) {
-      return res.status(400).json({
-        status: StatusCodes.BAD_REQUEST,
-        message: responsemessage.VALIDATEPASS,
-      });
-    } else {
-      let selectQuery = "SELECT * FROM admindata WHERE email = ?";
-      connection.query(selectQuery, [email], async (userError, userRows) => {
-        if (userRows.length === 0) {
-          return res.status(404).json({
-            status: StatusCodes.NOT_FOUND,
-            message: responsemessage.NOTFOUND,
-          });
-        } else {
-          const user = userRows[0];
-
-          if (newPassword !== confirmPassword) {
-            return res.status(400).json({
-              status: StatusCodes.BAD_REQUEST,
-              message: responsemessage.NOTMATCH,
-            });
-          } else if (
-            user.otpExpire <
-            new Date().toLocaleString("en-IN", {
-              timeZone: "Asia/Kolkata",
-            })
-          ) {
-            return res.status(400).json({
-              status: StatusCodes.BAD_REQUEST,
-              message: responsemessage.TIMEOUT,
-            });
-          } else {
-            const passwordHash = await passwordencrypt(newPassword);
-
-            connection.query(
-              "UPDATE admindata SET  otp = NULL,otpExpire= NULL,password = ? WHERE email = ?",
-              [passwordHash, email]
-            );
-
-            return res.status(200).json({
-              status: StatusCodes.OK,
-              message: responsemessage.PASSWORDCHANGE,
-            });
-          }
-          // }
-        }
-      });
-    }
-  } catch (error) {
-    // console.error("reset-password-error", error);
-    return res.status(500).json({
-      status: StatusCodes.INTERNAL_SERVER_ERROR,
-      message: responsemessage.INTERNAL_SERVER_ERROR,
-    });
-  }
-};
-
-exports.AdminResetPassword = async (req, res) => {
-  try {
-    const { id, oldPassword, newPassword, confirmPassword } = req.body;
-
-    const selectQuery = "SELECT * FROM admindata WHERE id = ?";
-
-    connection.query(selectQuery, [id], async (error, results) => {
+    connection.query(selectQuery, [userId], async (error, results) => {
       if (results.length === 0) {
         return res.status(404).json({
           status: StatusCodes.NOT_FOUND,
@@ -423,10 +276,10 @@ exports.AdminResetPassword = async (req, res) => {
             } else {
               const hashedPassword = await passwordencrypt(newPassword);
               const updateQuery =
-                "UPDATE admindata SET password = ? WHERE id = ?";
+                "UPDATE admin SET password = ? WHERE id = ?";
               connection.query(
                 updateQuery,
-                [hashedPassword, id],
+                [hashedPassword, userId],
                 (updateError) => {
                   if (updateError) {
                     console.log(updateError);

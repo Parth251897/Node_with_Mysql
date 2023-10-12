@@ -394,9 +394,8 @@ exports.UserUpdate = async (req, res) => {
             });
           } else {
             // const useremail = email ? email.toLowerCase() : undefined;
-            console.log();
-            // const profile = req.profileUrl;
-            // const document = JSON.stringify(req.documentUrl);
+           
+           
 
             const updatedatas = [];
             const updateValues = [];
@@ -409,14 +408,7 @@ exports.UserUpdate = async (req, res) => {
               updatedatas.push("phone = ?");
               updateValues.push(phone);
             }
-            // if (profile) {
-            //   updatedatas.push("profile = ?");
-            //   updateValues.push(profile);
-            // }
-            // if (document) {
-            //   updatedatas.push("document = ?");
-            //   updateValues.push(document);
-            // }
+            
             if (updatedatas.length === 0) {
               return res.status(404).json({
                 status: StatusCodes.NOT_FOUND,
@@ -454,7 +446,6 @@ exports.UserUpdate = async (req, res) => {
   }
 };
 
-
 exports.UserLogout = async (req, res) => {
   const token = req.headers.authorization;
 
@@ -466,146 +457,3 @@ exports.UserLogout = async (req, res) => {
   });
 };
 
-
-
-
-exports.SendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const expiry = Date.now() + 2 * 60 * 1000; // 10 minutes
-    const expiryIST = new Date(expiry).toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-    });
-
-    const userQuery = "SELECT * FROM employee WHERE email = ?";
-
-    connection.query(userQuery, [email], async (userError, userRows) => {
-      // console.log(userRows);
-      // if (userError) {
-      //   console.log("Error selecting user:", userError);
-      //   return res.status(500).json({
-      //     status: 500,
-      //     message: responsemessage.INTERROR,
-      //   });
-      // }
-
-      if (userRows.length === 0) {
-        return res.status(404).json({
-          status: StatusCodes.NOT_FOUNDSta,
-          message: responsemessage.NOTFOUND,
-        });
-      } else {
-        const OTP = generateOTP(); // Replace this with your OTP generation logic
-
-        const updateUserQuery =
-          "UPDATE employee SET otp = ?, otpExpire = ? WHERE email = ?";
-
-        const updateParams = [OTP, expiryIST, email];
-
-        connection.query(
-          updateUserQuery,
-          updateParams,
-          async (updateUserError, updateResult) => {
-            let response = await sendEmail(email, OTP);
-            if (response.error) {
-              return res.status(503).json({
-                status: StatusCodes.SERVICE_UNAVAILABLE,
-                message: responsemessage.SERVICE_UNAVAILABLE,
-              });
-            } else {
-              console.log("Email sent:", response.email);
-              return res.status(200).json({
-                status: StatusCodes.OK,
-                email: email,
-                OTP: OTP,
-                otpExpire: expiryIST,
-                message: responsemessage.FOUNDDETAILS,
-              });
-            }
-          }
-        );
-      }
-    });
-  } catch (error) {
-    // console.error("OTP error:", error);
-    return res.status(500).json({
-      status: StatusCodes.INTERNAL_SERVER_ERROR,
-      message: responsemessage.INTERNAL_SERVER_ERROR,
-    });
-  }
-};
-
-exports.ForgotPassword = async (req, res) => {
-  try {
-    const { email, newPassword, confirmPassword } = req.body;
-    if (!newPassword || !confirmPassword || !email) {
-      return res.status(400).json({
-        status: 400,
-        error: true,
-        message: responsemessage.NOTEMPTY,
-      });
-    } else if (!validatePassword(newPassword)) {
-      return res.status(400).json({
-        status: StatusCodes.BAD_REQUEST,
-        message: responsemessage.VALIDATEPASS,
-      });
-    } else {
-      let selectQuery = "SELECT * FROM employee WHERE email = ?";
-      connection.query(selectQuery, [email], async (userError, userRows) => {
-        if (userRows.length === 0) {
-          return res.status(404).json({
-            status: StatusCodes.NOT_FOUND,
-            message: responsemessage.NOTFOUND,
-          });
-        } else {
-          const user = userRows[0];
-
-          if (newPassword !== confirmPassword) {
-            return res.status(400).json({
-              status: StatusCodes.BAD_REQUEST,
-              message: responsemessage.NOTMATCH,
-            });
-          } else if (
-            user.otpExpire <
-            new Date().toLocaleString("en-IN", {
-              timeZone: "Asia/Kolkata",
-            })
-          ) {
-            return res.status(400).json({
-              status: StatusCodes.BAD_REQUEST,
-              message: responsemessage.TIMEOUT,
-            });
-          } else {
-            const passwordHash = await passwordencrypt(newPassword);
-
-            connection.query(
-              "UPDATE employee SET  otp = NULL,otpExpire= NULL,password = ? WHERE email = ?",
-              [passwordHash, email],
-              (updateError) => {
-                if (updateError) {
-                  console.log(updateError);
-                  return res.status(400).json({
-                    status: StatusCodes.BAD_REQUEST,
-                    message: responsemessage.PASSNOTCHANGE,
-                  });
-                } else {
-                  return res.status(200).json({
-                    status: StatusCodes.OK,
-                    message: responsemessage.PASSWORDCHANGE,
-                  });
-                }
-              }
-            );
-          }
-        }
-      });
-    }
-  } catch (error) {
-    // console.error("reset-password-error", error);
-    return res.status(500).json({
-      status: StatusCodes.INTERNAL_SERVER_ERROR,
-      message: responsemessage.INTERNAL_SERVER_ERROR,
-    });
-  }
-};

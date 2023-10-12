@@ -4,10 +4,10 @@ const mysql = require("mysql");
 // Create a connection pool
 const connection = mysql.createPool({
 
-  host: "localhost", // Your MySQL host
-  user: "root", // Your MySQL username
-  password: "", // Your MySQL password
-  database: "Emp_sql", // Your database name
+  host: "localhost", 
+  user: "root", 
+  password: "", 
+  database: "Emp_sql", 
 });
 
 // Test the connection
